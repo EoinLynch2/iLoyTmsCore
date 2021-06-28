@@ -4,13 +4,16 @@ using System.Linq;
 using iLoyTmsCore.Models;
 using iLoyTmsCore.Repo;
 using iLoyTmsCore.Service;
+using System;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.IO;
+using System.Net.Http;
+using System.Net;
+using System.Net.Http.Headers;
 
 namespace iLoyTaskManagementSystem.Controllers
 {
-
-
     [Route("api/[controller]")]
-    [ApiController]
     public class TmsTaskController : Controller
     {
         private readonly ITmsTaskService tmsTaskService; 
@@ -30,8 +33,7 @@ namespace iLoyTaskManagementSystem.Controllers
         /// Returns all tasks in database.
         /// </summary>
         /// <returns></returns>
-        [HttpGet("TmsTask/")]
-        
+        [HttpGet]
         public IEnumerable<TmsTask> Get()
         {
             return tmsTaskService.GetTmsTasks();
@@ -44,7 +46,7 @@ namespace iLoyTaskManagementSystem.Controllers
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        [HttpGet("TmsTask/{id}")]
+        [HttpGet("{id}")]
         public TmsTask Get(int id)
         {
             var TmsTask = tmsTaskService.GetTmsTask(id);
@@ -58,14 +60,13 @@ namespace iLoyTaskManagementSystem.Controllers
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        [Route("TmsTask/Delete/{id}"), HttpDelete]
-        public IHttpActionResult Delete(int id)
+        [HttpDelete("Delete/{id}")]
+        public IActionResult Delete(int id)
         {
-            var tmsTask = _dbContext.TmsTasks.Find(id);
+            var tmsTask = tmsTaskService.GetTmsTask(id);
             if (tmsTask == null)
-                return BadRequest("No task found with that id");
-            _dbContext.TmsTasks.Remove(tmsTask);
-            _dbContext.SaveChanges();
+                return NotFound("No task found with that id");
+            tmsTaskService.DeleteTmsTask(tmsTask);
             return Ok();
         }
 
@@ -78,37 +79,42 @@ namespace iLoyTaskManagementSystem.Controllers
         /// <param name="tmsTask"></param>
         /// <param name="parentTaskId"> </param>
         /// <returns></returns>
-        [Route("TmsTask/Add/{parentTaskId?}"), HttpPost] //if parent taskId is specified, the TmsTask object will be a subtask assigned to the parentTask of associated id
-        public IHttpActionResult Post([FromBody] TmsTask tmsTask, int? parentTaskId = null)
+        [HttpPost("Add/{parentTaskId?}")] //if parent taskId is specified, the TmsTask object will be a subtask assigned to the parentTask of associated id
+        public IActionResult Post([FromBody] TmsTask tmsTask, int? parentTaskId = null)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             if (tmsTask.State == null)
                 return BadRequest("The state must exist");
-
-            bool isParentTaskExists = false;
-
+            bool parentTaskExists = false;
             if (parentTaskId != null)
             {
-                isParentTaskExists = IsTaskExists(parentTaskId);
+                TmsTask parentTmsTask = tmsTaskService.GetTmsTask((int)parentTaskId);
 
-                if (isParentTaskExists)
+                if (parentTmsTask != null)
+                {
                     tmsTask.ParentTmsTaskId = (int)parentTaskId;
+                    parentTaskExists = true;
+                }
                 else
-                    return BadRequest("The specified parent task does not exist");
+                    return NotFound("The specified parent task does not exist");
             }
 
             try
             {
-                _dbContext.Set<TmsTask>().Add(tmsTask);
-                _dbContext.SaveChanges();
-                if (isParentTaskExists)
+                tmsTaskService.InsertTmsTask(tmsTask);
+                if (parentTaskExists)
                 {
-                    UpdateParentTaskStatus((int)parentTaskId);
+                    tmsTaskService.UpdateParentTaskStatus((int)parentTaskId);
                 }
             }
-            catch (DbUpdateException updateException)
+            catch (Exception ex)
             {
                 //Log exception //Don't give detailed error message in production...
-                return BadRequest("Update Exception: " + updateException.ToString());
+                return BadRequest("Update Exception. See server logs for more details.");
             }
             return Ok();
         }
@@ -121,34 +127,32 @@ namespace iLoyTaskManagementSystem.Controllers
         /// <param name="id"> the id provided</param>
         /// <param name="tmsTask"></param>
         /// <returns></returns>
-        [Route("TmsTask/Update/{id}"), HttpPut]
-        public IHttpActionResult Update(int id, [FromBody] TmsTask tmsTask)
+        [HttpPut("Update/{id}")]
+        public IActionResult Update(int id, [FromBody] TmsTask tmsTask)
         {
-            var lookupTask = _dbContext.TmsTasks.Find(id);
+            var lookupTask = tmsTaskService.GetTmsTask(id);
             if (id <= 0)
-                return BadRequest();
+                return BadRequest("An id must be provided for this record");
             else if (lookupTask == null)
-                return BadRequest("No task exists for this id");
-            //TODO: add lookup, throw error if not exist
+                return NotFound("No task exists for this id");
 
-
-            var entity = _dbContext.TmsTasks.FirstOrDefault(t => t.TmsTaskId == id);
+            var entity = tmsTaskService.GetTmsTask(id);
             entity.TaskName = tmsTask.TaskName;
             entity.Description = tmsTask.Description;
             entity.StartDate = tmsTask.StartDate;
             entity.FinishDate = tmsTask.FinishDate;
             entity.State = tmsTask.State;
-            _dbContext.SaveChanges();
+            tmsTaskService.UpdateTmsTask(entity);
 
             if (entity.ParentTmsTaskId > 0)
-                UpdateParentTaskStatus((int)entity.ParentTmsTaskId);
+                tmsTaskService.UpdateParentTaskStatus((int)entity.ParentTmsTaskId);
             else
             {
-                int numOfSubtasksOfThisTask = _dbContext.TmsTask
-                    .Where(t => t.ParentTmsTaskId == id).Count();
+                int numOfSubtasksOfThisTask = tmsTaskService.GetNoOfSubtasksForTmsTask(tmsTask);
+                    
                 if (numOfSubtasksOfThisTask > 0)
                     //If a parents task status is manually overridden, we will call update the task status to ensure correctness.
-                    UpdateParentTaskStatus(id);
+                    tmsTaskService.UpdateParentTaskStatus(id);
             }
             return Ok();
         }
@@ -161,19 +165,20 @@ namespace iLoyTaskManagementSystem.Controllers
         /// </summary>
         /// <param name="date"></param>
         /// <returns></returns>
-        /*[Route("GetInProgressTasks/{date?}")]
-        public HttpResponseMessage GetInprogressTasksForDate(DateTimeOffset date)
+        [HttpGet("GetInProgressTasks/{date?}")]
+        public string GetInprogressTasksForDate(DateTime date)
         {
-            if (date == null)
-            {
-                HttpError err = new HttpError("A date must be provided");
-                return Request.CreateResponse(HttpStatusCode.BadRequest);
-            }
-            //Url param should be passed like: GetInProgressTasks?date=2021-06-21T05:04:18.070Z
-
             MemoryStream stream = new MemoryStream();
             StreamWriter writer = new StreamWriter(stream);
-            var taskList = _dbContext.TmsTasks
+
+            if (date == null)
+            {
+                HttpResponseMessage httpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
+                //return httpResponseMessage;
+            }
+            //Url param should be passed like: GetInProgressTasks?date=2021-06-21
+
+            var taskList = tmsTaskService.GetTmsTasks()
                 .Where(t => t.StartDate <= date && t.State == "InProgress")
                 .ToList();
 
@@ -186,19 +191,18 @@ namespace iLoyTaskManagementSystem.Controllers
                 csv += "FinishDate:" + tmsTask.FinishDate + ",";
                 csv += "State:" + tmsTask.State + ",\n";
             }
+            return csv;
 
-
-            writer.Write(csv);
+            /*writer.Write(csv);
             writer.Flush();
             stream.Position = 0;
 
-            HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+            HttpResponseMessage result = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
             result.Content = new StreamContent(stream);
             result.Content.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
             result.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileName = "Export.csv" };
-            return result;
-        }*/
-
+            return result;*/
+        }
 
         /// <summary>
         /// Will update status of parent task id based on following rules
@@ -207,46 +211,21 @@ namespace iLoyTaskManagementSystem.Controllers
         /// Planned in all other cases.
         /// </summary>
         /// <param name="ParentTaskId"></param>
-        public void UpdateParentTaskStatus(int ParentTaskId)
-        {
-            string parentTaskState = "Planned";
 
-            int totalSubtasks = _dbContext.TmsTasks
-                .Where(t => t.ParentTmsTaskId == ParentTaskId)
-                .Count();
-
-            int totalCompletedSubtasks = _dbContext.TmsTasks
-                .Where(t => t.ParentTmsTaskId == ParentTaskId && t.State == "Completed").Count();
-
-            if (totalCompletedSubtasks == totalSubtasks)
-            {
-                parentTaskState = "Completed";
-            }
-            else
-            {
-                int totalInProgressSubtasks = _dbContext.TmsTasks
-                    .Where(t => t.ParentTmsTaskId == ParentTaskId && t.State == "InProgress").Count();
-                if (totalInProgressSubtasks > 0)
-                    parentTaskState = "InProgress";
-            }
-
-            TmsTask parentTmsTask = _dbContext.TmsTasks.Find(ParentTaskId);
-            parentTmsTask.State = parentTaskState;
-            _dbContext.SaveChanges();
-        }
 
         /// <summary>
         /// Returns true if tasks exists based on id.
         /// </summary>
         /// <param name="taskId"></param>
         /// <returns></returns>
-        public bool IsTaskExists(int? taskId)
+        /*public bool IsTaskExists(int? taskId)
         {
             bool isTaskExists = false;
-            if (_dbContext.TmsTasks.Any(t => t.TmsTaskId == taskId))
+            TmsTask tmsTask = tmsTaskService.GetTmsTask((int)taskId);
+            if (tmsTask != null)
                 isTaskExists = true;
             return isTaskExists;
-        }
+        }*/
 
     }
 }

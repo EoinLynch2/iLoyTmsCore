@@ -1,4 +1,6 @@
 using iLoyTmsCore.Repo;
+using iLoyTmsCore.Service;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -27,6 +29,12 @@ namespace iLoyTmsCore
         {
             services.AddRazorPages();
             services.AddDbContext<ApiDbContext>(options => options.UseSqlServer(@"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=iLoyTaskDb;"));
+            services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+            services.AddTransient<ITmsTaskService, TmsTaskService>();
+            services.AddControllers();
+            services.AddControllers().AddNewtonsoftJson(options =>
+                options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+            );
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -55,6 +63,11 @@ namespace iLoyTmsCore
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapRazorPages();
+            });
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
             });
         }
     }

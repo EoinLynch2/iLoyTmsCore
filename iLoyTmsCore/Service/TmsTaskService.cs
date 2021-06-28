@@ -38,12 +38,43 @@ namespace iLoyTmsCore.Service
             tmsTaskRepository.Update(tmsTask);
         }
 
-        public void DeleteTmsTask(int id)
+        public void DeleteTmsTask(TmsTask tmsTask)
         {
-    
-            TmsTask tmsTask = GetTmsTask(id);
             tmsTaskRepository.Remove(tmsTask);
             tmsTaskRepository.SaveChanges();
+        }
+
+        public int GetNoOfSubtasksForTmsTask(TmsTask tmsTask)
+        {
+            int numSubtasks = tmsTask.Subtasks.Count;
+            return numSubtasks;
+        }
+
+
+        public void UpdateParentTaskStatus(int ParentTaskId)
+        {
+            string parentTaskState = "Planned";
+            TmsTask tmsTask = tmsTaskRepository.Get(ParentTaskId);
+
+            int totalSubtasks = GetNoOfSubtasksForTmsTask(tmsTask);
+
+            int totalCompletedSubtasks = tmsTask.Subtasks.Where(t => t.ParentTmsTaskId == ParentTaskId && t.State == "Completed").Count();
+
+
+            if (totalCompletedSubtasks == totalSubtasks)
+            {
+                parentTaskState = "Completed";
+            }
+            else
+            {
+                int totalInProgressSubtasks = tmsTask.Subtasks
+                    .Where(t => t.ParentTmsTaskId == ParentTaskId && t.State == "InProgress").Count();
+                if (totalInProgressSubtasks > 0)
+                    parentTaskState = "InProgress";
+            }
+
+            tmsTask.State = parentTaskState;
+            tmsTaskRepository.Update(tmsTask);
         }
     }
 }

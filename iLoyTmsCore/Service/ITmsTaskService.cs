@@ -12,7 +12,8 @@ namespace iLoyTmsCore.Service
         TmsTask GetTmsTask(int id);
         void InsertTmsTask(TmsTask tmsTask);
         void UpdateTmsTask(TmsTask tmsTask);
-        void DeleteTmsTask(int id);
-
+        void DeleteTmsTask(TmsTask tmsTask);
+        int GetNoOfSubtasksForTmsTask(TmsTask tmsTask);
+        void UpdateParentTaskStatus(int parentTaskId);
     }
 }

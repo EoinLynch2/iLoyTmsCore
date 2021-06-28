@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31112.23
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "iLoyTmsCore", "iLoyTmsCore\iLoyTmsCore.csproj", "{2B90433D-2181-477A-92B6-A79B9C8D12F3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "iLoyTmsCore", "iLoyTmsCore\iLoyTmsCore.csproj", "{2B90433D-2181-477A-92B6-A79B9C8D12F3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "iLoyTmsCoreTest", "iLoyTmsCoreTest\iLoyTmsCoreTest.csproj", "{97378CAF-E126-4689-AA5E-16D6756E025D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{2B90433D-2181-477A-92B6-A79B9C8D12F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2B90433D-2181-477A-92B6-A79B9C8D12F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2B90433D-2181-477A-92B6-A79B9C8D12F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{97378CAF-E126-4689-AA5E-16D6756E025D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97378CAF-E126-4689-AA5E-16D6756E025D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97378CAF-E126-4689-AA5E-16D6756E025D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97378CAF-E126-4689-AA5E-16D6756E025D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
