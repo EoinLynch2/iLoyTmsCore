@@ -11,7 +11,7 @@ using System.Net.Http;
 using System.Net;
 using System.Net.Http.Headers;
 
-namespace iLoyTaskManagementSystem.Controllers
+namespace iLoyTmsCore.Controllers
 {
     [Route("api/[controller]")]
     public class TmsTaskController : Controller
