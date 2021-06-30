@@ -28,7 +28,7 @@ namespace iLoyTmsCore
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddRazorPages();
-            services.AddDbContext<ApiDbContext>(options => options.UseSqlServer(@"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=iLoyTaskDb;"));
+            services.AddDbContext<ApiDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DEV")));
             services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
             services.AddTransient<ITmsTaskService, TmsTaskService>();
             services.AddControllers();
